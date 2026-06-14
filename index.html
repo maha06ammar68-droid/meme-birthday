@@ -272,11 +272,16 @@ footer {
       <button class="send-btn" onclick="submitWish()">أرسل أمنيتك 🌷</button>
       <div class="toast" id="toast">✨ وصلت أمنيتك! يسلموا قلبك 💕</div>
     </div>
-    <p class="wall-title">جدار الأمنيات 💌</p>
+    <p class="wall-title" id="wallTitle">جدار الأمنيات 💌</p>
     <div class="wishes-list" id="wList"></div>
   </section>
 
-  <footer>Made with love for Maha 💕</footer>
+  <footer>
+  Made with love for Maha 💕
+  <br>
+  <br>
+  <span onclick="promptAdmin()" style="font-size:22px;cursor:pointer;opacity:0.4;">🔒</span>
+</footer>
 </div>
 
 <script>
@@ -365,6 +370,17 @@ function startPetals(){
   }
 }
 
+// Admin
+const ADMIN_PASS = '1234';
+let isAdmin = false;
+
+function promptAdmin(){
+  if(isAdmin){ isAdmin=false; render(); alert('خرجتِ من وضع الإدارة'); return; }
+  const p = prompt('🔐 كلمة السر:');
+  if(p===ADMIN_PASS){ isAdmin=true; render(); alert('✅ أهلاً مها! يمكنك الآن إدارة الأمنيات'); }
+  else if(p!==null) alert('❌ كلمة السر غلط');
+}
+
 // Wishes
 let wishes=[];
 async function load(){
@@ -395,28 +411,62 @@ function render(){
   const list=document.getElementById('wList');
   if(!list) return;
   list.innerHTML='';
-  if(!wishes.length){
+
+  // Filter: non-admins see only visible wishes
+  const visible = wishes.filter(w => isAdmin || !w.hidden);
+
+  if(!visible.length){
     list.innerHTML='<div class="empty-wall">🌸 كوني أول من يكتب أمنية لمها!</div>'; return;
   }
+
+  if(isAdmin){
+    list.innerHTML += `<div style="text-align:center;background:rgba(212,197,232,0.3);border-radius:16px;padding:10px;margin-bottom:12px;font-size:13px;color:#9A7A8A;">🔐 وضع الإدارة — اضغطي على عنوان الجدار ٥ مرات للخروج</div>`;
+  }
+
   [...wishes].reverse().forEach((w,i)=>{
+    const realIdx = wishes.indexOf(w);
     const [c1,c2]=avGrads[i%avGrads.length];
-    const card=document.createElement('div'); card.className='wish-card';
+    if(!isAdmin && w.hidden) return;
+    const card=document.createElement('div');
+    card.className='wish-card';
+    card.style.opacity = w.hidden ? '0.5' : '1';
+    card.style.border = w.hidden ? '1.5px dashed #D4C5E8' : '';
     card.innerHTML=`
       <div class="wish-avatar" style="background:linear-gradient(135deg,${c1},${c2})">${w.name.trim()[0]}</div>
       <div style="flex:1">
-        <div class="wish-name">${w.name}</div>
+        <div class="wish-name">${w.name} ${w.hidden ? '<span style="font-size:11px;color:#C9A96E;font-weight:400;">— مخفية</span>' : ''}</div>
         <div class="wish-text">${w.text}</div>
         <div class="wish-time">${timeAgo(w.ts)}</div>
+        ${isAdmin ? `
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button onclick="toggleHide(${realIdx})" style="padding:5px 14px;border-radius:50px;border:1.5px solid #D4C5E8;background:white;font-family:Tajawal,sans-serif;font-size:12px;cursor:pointer;color:#9A7A8A;">
+            ${w.hidden ? '👁️ إظهار' : '🙈 إخفاء'}
+          </button>
+          <button onclick="deleteWish(${realIdx})" style="padding:5px 14px;border-radius:50px;border:1.5px solid #F0C0C0;background:white;font-family:Tajawal,sans-serif;font-size:12px;cursor:pointer;color:#C08080;">
+            🗑️ حذف
+          </button>
+        </div>` : ''}
       </div>`;
     list.appendChild(card);
   });
+}
+
+async function toggleHide(idx){
+  wishes[idx].hidden = !wishes[idx].hidden;
+  await save(); render();
+}
+
+async function deleteWish(idx){
+  if(!confirm('تأكيدي الحذف؟')) return;
+  wishes.splice(idx,1);
+  await save(); render();
 }
 
 async function submitWish(){
   const name=document.getElementById('wName').value.trim();
   const text=document.getElementById('wText').value.trim();
   if(!name||!text){alert('من فضلك اكتب اسمك وأمنيتك 🌸');return;}
-  wishes.push({name,text,ts:Date.now()});
+  wishes.push({name,text,ts:Date.now(),hidden:false});
   await save(); render();
   document.getElementById('wName').value='';
   document.getElementById('wText').value='';
